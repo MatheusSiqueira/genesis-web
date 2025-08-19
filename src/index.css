@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+body {
+  @apply bg-genesis-bg text-genesis-ink;
+  background: url("/assets/logo-genesis.png") no-repeat center center fixed;
+  background-size: min(70vmin, 900px);
+  /* se quiser, use um véu bem leve para contraste:
+  background-image:
+    linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)),
+    url("/assets/logo-genesis.png");
+  */
+}
