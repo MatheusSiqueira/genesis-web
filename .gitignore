@@ -7,3 +7,6 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*
 .DS_Store
+!.env.production
+!.env.development
+!.env.example
