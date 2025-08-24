@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 export default function Portal({ children }: { children: ReactNode }) {
   // se quiser, use um nó dedicado; senão, caia no body
