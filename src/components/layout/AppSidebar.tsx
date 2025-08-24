@@ -1,4 +1,3 @@
-// AppSidebar.tsx
 import { NavLink } from "react-router-dom";
 import {
   UsersIcon,
@@ -13,10 +12,10 @@ function Item({ to, icon: Icon, label }: ItemProps) {
   return (
     <NavLink
       to={to}
-      end={to === "/dashboard"} // evita ficar ativo em rotas filhas do dashboard se não quiser
+      end={to === "/dashboard"}
       className={({ isActive }) =>
         [
-          "group flex items-center justify-center w-12 h-12 rounded-xl transition",
+          "group flex items-center justify-center w-12 h-12 transition",
           "text-white",
           isActive
             ? "bg-white/25 ring-1 ring-white/40 shadow"
@@ -35,17 +34,20 @@ export default function AppSidebar() {
   return (
     <aside
       className="
-        fixed left-5 top-5 bottom-5 w-16
-        rounded-2xl bg-genesis-primary50/95 backdrop-blur
-        text-white p-2 flex flex-col items-center gap-3 shadow-card
-        z-[60] select-none
+        fixed left-0 top-0 bottom-0 w-20
+        bg-genesis-primary50/95 backdrop-blur
+        text-white p-3 flex flex-col items-center gap-4 shadow-xl
+        z-30 select-none
         supports-[backdrop-filter]:bg-genesis-primary50/80
       "
     >
-      <div className="w-10 h-10 rounded-xl bg-white/95 flex items-center justify-center">
+      {/* Logo */}
+      <div className="w-12 h-12 flex items-center justify-center bg-white/95 rounded-md">
         <img src={Logo} className="h-7 w-auto" alt="Genesis" />
       </div>
-      <nav className="mt-2 flex flex-col gap-2">
+
+      {/* Navegação */}
+      <nav className="mt-4 flex flex-col gap-3">
         <Item to="/dashboard" icon={Squares2X2Icon} label="Dashboard" />
         <Item to="/pacientes" icon={UsersIcon} label="Pacientes" />
         <Item to="/exames" icon={ClipboardDocumentListIcon} label="Exames" />
@@ -53,3 +55,4 @@ export default function AppSidebar() {
     </aside>
   );
 }
+

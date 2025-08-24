@@ -1,7 +1,7 @@
-export interface Paciente {
-  id: string;       // ajuste se seu backend usa "guid" como "id"
+export type Paciente = {
+  id: string;
   nome: string;
   cpf: string;
   email?: string;
-  dataNascimento?: string; // ISO
-}
+  dataNascimento?: string; // <-- alinhar com o DTO do back
+};

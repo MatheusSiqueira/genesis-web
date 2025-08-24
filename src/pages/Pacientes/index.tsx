@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Paciente } from "@/types/paciente";
-import {
-  getPacientes, createPaciente, updatePaciente, deletePaciente,
-} from "@/services/pacientes";
+import { getPacientes, createPaciente, updatePaciente, deletePaciente } from "@/services/pacientes";
 import AppHeader from "@/components/layout/AppHeader";
 import PacienteFormModal from "./PacienteFormModal";
-import {
-  XMarkIcon, PencilSquareIcon, TrashIcon,
-} from "@heroicons/react/24/outline";
+import { XMarkIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import Button from "@/ui/Button";
 
 type Chip = { id: string; label: string };
 
@@ -24,57 +21,41 @@ function FilterChip({ chip, onRemove }: { chip: Chip; onRemove: (id: string) => 
 }
 
 export default function PacientesList() {
-  const [data, setData] = useState<Paciente[]>([]);
+  const [items, setItems] = useState<Paciente[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+
   const [qRaw, setQRaw] = useState("");
-  const q = useDebouncedValue(qRaw, 300); // só atualiza q depois de 300ms
+  const q = useDebouncedValue(qRaw, 300);
+
   const [chips, setChips] = useState<Chip[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
+
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Paciente | null>(null);
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const pageCount = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
+
   async function load() {
-    const res = await getPacientes();
-    setData(res ?? []);
+    setLoading(true);
+    try {
+      const res = await getPacientes({ page, pageSize, q });
+      setItems(res.items);
+      setTotal(res.total);
+      if (page > Math.ceil(res.total / res.pageSize) && res.total > 0) setPage(1);
+    } finally {
+      setLoading(false);
+    }
   }
-  useEffect(() => { load(); }, []);
 
-  // ----- Busca (debounced) e filtro separados -----
-  const term = useMemo(() => q.trim().toLowerCase(), [q]);
+  // dispara quando muda página, pageSize ou busca
+  useEffect(() => { load(); }, [page, pageSize, q]);
 
-  const base = useMemo(() => {
-    if (!term) return data;
-    return data.filter(p =>
-      p.nome?.toLowerCase().includes(term) ||
-      p.cpf?.toLowerCase().includes(term) ||
-      (p.email?.toLowerCase().includes(term) ?? false)
-    );
-  }, [data, term]);
-
-  // ----- Cálculo de paginação para o resultado filtrado -----
-  const pageCount = useMemo(
-    () => Math.max(1, Math.ceil(base.length / pageSize)),
-    [base.length, pageSize]
-  );
-
-  // Se a página atual ficou inválida após uma busca/troca de pageSize, clamp para última válida
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
-  }, [page, pageCount]);
-
-  const start = (page - 1) * pageSize;
-
-  const filtered = useMemo(() => {
-    return {
-      items: base.slice(start, start + pageSize),
-      total: base.length,
-      pageCount,
-      current: page,
-    };
-  }, [base, start, pageSize, page, pageCount]);
-
-  const startItem = filtered.total ? (filtered.current - 1) * pageSize + 1 : 0;
-  const endItem = filtered.total ? Math.min(filtered.current * pageSize, filtered.total) : 0;
+  const startItem = total ? (page - 1) * pageSize + 1 : 0;
+  const endItem = total ? Math.min(page * pageSize, total) : 0;
 
   function removeChip(id: string) { setChips(prev => prev.filter(c => c.id !== id)); }
   function clearChips() { setChips([]); }
@@ -84,26 +65,12 @@ export default function PacientesList() {
       <AppHeader
         title="Pacientes"
         searchValue={qRaw}
-        onSearchChange={(v) => {
-          // não resetamos a página aqui; o clamp garante coerência
-          setQRaw(v);
-        }}
-        right={
-          <select
-            className="rounded-xl border px-3 py-2 bg-white"
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              // sem reset: clamp cuidará se a página atual ficar inválida
-            }}
-          >
-            {[5, 8, 10, 20, 50].map(n => <option key={n} value={n}>{n} / pág</option>)}
-          </select>
-        }
+        onSearchChange={(v) => { setQRaw(v); setPage(1); }} // reset p/ 1 ao trocar busca
+        pageSize={pageSize}
+        onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
         onNew={() => { setEditing(null); setOpen(true); }}
       />
 
-      {/* Chips de filtro + limpar */}
       {chips.length > 0 && (
         <div className="bg-white rounded-2xl shadow-card px-4 py-3 flex flex-wrap items-center gap-2">
           <span className="text-sm text-genesis-inkSoft mr-1">Filtrar por:</span>
@@ -114,7 +81,7 @@ export default function PacientesList() {
         </div>
       )}
 
-      {/* Conteúdo: tabela desktop, cards mobile */}
+      {/* Tabela (desktop) */}
       <div className="hidden md:block bg-white rounded-2xl shadow-card overflow-hidden">
         <div className="overflow-auto max-h-[65vh]">
           <table className="min-w-full text-sm">
@@ -131,71 +98,89 @@ export default function PacientesList() {
               </tr>
             </thead>
             <tbody>
-              {filtered.items.map(p => (
+              {loading && (
+                <tr><td colSpan={5} className="p-6 text-center text-gray-500">Carregando…</td></tr>
+              )}
+              {!loading && items.map(p => (
                 <tr key={p.id} className="border-t hover:bg-gray-50">
                   <td className="p-3 pl-4 font-medium">{p.nome}</td>
                   <td className="p-3">{p.cpf}</td>
                   <td className="p-3">{p.email ?? "-"}</td>
                   <td className="p-3">{p.dataNascimento ? new Date(p.dataNascimento).toLocaleDateString() : "-"}</td>
                   <td className="p-3 pr-4 text-right">
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconLeft={<PencilSquareIcon className="h-4 w-4" />}
+                      className="mr-2"
                       onClick={() => { setEditing(p); setOpen(true); }}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-lg border mr-2 hover:bg-gray-50"
                     >
-                      <PencilSquareIcon className="h-4 w-4" /> Editar
-                    </button>
-                    <button
+                      Editar
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      iconLeft={<TrashIcon className="h-4 w-4" />}
+                      isLoading={deletingId === p.id}
                       onClick={async () => {
                         if (!confirm("Excluir paciente?")) return;
-                        await deletePaciente(p.id);
-                        load();
+                        try {
+                          setDeletingId(p.id);
+                          await deletePaciente(p.id);
+                          await load();
+                        } finally {
+                          setDeletingId(null);
+                        }
                       }}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700"
                     >
-                      <TrashIcon className="h-4 w-4" /> Excluir
-                    </button>
+                      Excluir
+                    </Button>
                   </td>
                 </tr>
               ))}
-              {filtered.items.length === 0 && (
+              {!loading && items.length === 0 && (
                 <tr><td colSpan={5} className="p-6 text-center text-gray-500">Nenhum paciente encontrado.</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Footer tabela */}
+        {/* Footer da tabela */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-3 border-t">
           <div className="text-sm text-gray-600">
-            Exibindo <b>{startItem}</b>–<b>{endItem}</b> de <b>{filtered.total}</b>
+            Exibindo <b>{startItem}</b>–<b>{endItem}</b> de <b>{total}</b>
           </div>
           <div className="flex gap-1">
             <button
               className="px-3 py-1 rounded-lg border disabled:opacity-40"
-              disabled={filtered.current <= 1}
+              disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
             >Anterior</button>
-            {Array.from({ length: filtered.pageCount }).map((_, i) => {
-              const n = i + 1, active = n === filtered.current;
+            {Array.from({ length: pageCount }).map((_, i) => {
+              const n = i + 1, active = n === page;
               return (
-                <button key={n} onClick={() => setPage(n)}
-                  className={`px-3 py-1 rounded-lg border ${active ? "bg-genesis-primary text-white border-genesis-primary" : ""}`}>
+                <button
+                  key={n}
+                  onClick={() => setPage(n)}
+                  className={`px-3 py-1 rounded-lg border ${active ? "bg-genesis-primary text-white border-genesis-primary" : ""}`}
+                >
                   {n}
                 </button>
               );
             })}
             <button
               className="px-3 py-1 rounded-lg border disabled:opacity-40"
-              disabled={filtered.current >= filtered.pageCount}
-              onClick={() => setPage(p => Math.min(filtered.pageCount, p + 1))}
+              disabled={page >= pageCount}
+              onClick={() => setPage(p => Math.min(pageCount, p + 1))}
             >Próxima</button>
           </div>
         </div>
       </div>
 
-      {/* Mobile cards */}
+      {/* Cards (mobile) */}
       <div className="md:hidden space-y-3">
-        {filtered.items.map(p => (
+        {loading && <div className="bg-white rounded-2xl shadow-card p-3 text-center text-gray-500">Carregando…</div>}
+        {!loading && items.map(p => (
           <div key={p.id} className="bg-white rounded-2xl shadow-card p-3">
             <div className="flex items-start justify-between">
               <div>
@@ -203,8 +188,30 @@ export default function PacientesList() {
                 <div className="text-xs text-gray-500">CPF: {p.cpf}</div>
               </div>
               <div className="flex gap-2">
-                <button className="px-3 py-1 rounded-lg border text-sm" onClick={() => { setEditing(p); setOpen(true); }}>Editar</button>
-                <button className="px-3 py-1 rounded-lg bg-red-600 text-white text-sm" onClick={async () => { if (!confirm("Excluir?")) return; await deletePaciente(p.id); load(); }}>Excluir</button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setEditing(p); setOpen(true); }}
+                >
+                  Editar
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  isLoading={deletingId === p.id}
+                  onClick={async () => {
+                    if (!confirm("Excluir?")) return;
+                    try {
+                      setDeletingId(p.id);
+                      await deletePaciente(p.id);
+                      await load();
+                    } finally {
+                      setDeletingId(null);
+                    }
+                  }}
+                >
+                  Excluir
+                </Button>
               </div>
             </div>
             <div className="mt-2 text-sm">
@@ -213,6 +220,25 @@ export default function PacientesList() {
             </div>
           </div>
         ))}
+
+        {/* Paginação também no mobile */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="text-xs text-gray-600 pl-1">
+            {startItem}–{endItem} de {total}
+          </div>
+          <div className="flex gap-1">
+            <button
+              className="px-3 py-1 rounded-lg border text-sm disabled:opacity-40"
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >Anterior</button>
+            <button
+              className="px-3 py-1 rounded-lg border text-sm disabled:opacity-40"
+              disabled={page >= pageCount}
+              onClick={() => setPage(p => Math.min(pageCount, p + 1))}
+            >Próxima</button>
+          </div>
+        </div>
       </div>
 
       {/* Modal */}
@@ -221,7 +247,6 @@ export default function PacientesList() {
         onClose={() => setOpen(false)}
         initialData={editing}
         onSaved={load}
-        // Dica: se o seu PacienteFormModal exige Promise<void>, envolva os services:
         onSubmitCreate={async (payload) => { await createPaciente(payload); }}
         onSubmitUpdate={async (id, payload) => { await updatePaciente(id, payload); }}
       />

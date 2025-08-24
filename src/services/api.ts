@@ -1,4 +1,3 @@
-// src/services/api.ts
 import axios from "axios";
 
 const baseURL = import.meta.env.VITE_API_URL ?? "/api";
@@ -9,6 +8,23 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+// 401 → limpa token e manda para login
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err?.response?.status;
+    if (status === 401) {
+      localStorage.removeItem("token");
+      // evita loop quando já está no /login
+      if (location.pathname !== "/login") {
+        const from = encodeURIComponent(location.pathname + location.search);
+        window.location.replace(`/login?from=${from}`);
+      }
+    }
+    return Promise.reject(err);
+  }
+);
 
 // logs úteis em dev
 if (import.meta.env.DEV) {
