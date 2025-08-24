@@ -1,17 +1,9 @@
+import { type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useMemo, type ReactNode } from "react";
 
-export default function Portal({ children }: { children: ReactNode }) {
-  // se quiser, use um nó dedicado; senão, caia no body
-  const target = useMemo(() => {
-    let el = document.getElementById("portal-root");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "portal-root";
-      document.body.appendChild(el);
-    }
-    return el;
-  }, []);
+type Props = { children: ReactNode };
 
-  return createPortal(children, target);
+export default function Portal({ children }: Props) {
+  // Portal simples: joga o conteúdo para o <body>, sem useEffect
+  return createPortal(children, document.body);
 }
